@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Full IP Information</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <h1>Your IP and Location Info</h1>
+    <div id="info">Loading...</div>
+
+    <script>
+        fetch('https://ipapi.co/json/')
+            .then(response => response.json())
+            .then(data => {
+                let mapLink = `https://www.google.com/maps?q=${data.latitude},${data.longitude}`;
+                document.getElementById('info').innerHTML = `
+                    <p><strong>IP Address:</strong> ${data.ip}</p>
+                    <p><strong>City:</strong> ${data.city}</p>
+                    <p><strong>Region:</strong> ${data.region}</p>
+                    <p><strong>Country:</strong> ${data.country_name} (${data.country_code})</p>
+                    <p><strong>Postal Code:</strong> ${data.postal}</p>
+                    <p><strong>Latitude:</strong> ${data.latitude}</p>
+                    <p><strong>Longitude:</strong> ${data.longitude}</p>
+                    <p><strong>Location Map:</strong> <a href="${mapLink}" target="_blank">View on Google Maps</a></p>
+                    <p><strong>Timezone:</strong> ${data.timezone}</p>
+                    <p><strong>Currency:</strong> ${data.currency}</p>
+                    <p><strong>ISP / Organization:</strong> ${data.org}</p>
+                    <p><strong>ASN:</strong> ${data.asn}</p>
+                    <p><strong>Country Calling Code:</strong> ${data.country_calling_code}</p>
+                    <p><strong>Languages:</strong> ${data.languages}</p>
+                    <p><strong>VPN / Proxy Detected:</strong> ${data.security && data.security.is_proxy ? 'Yes' : 'No'}</p>
+                `;
+            })
+            .catch(error => {
+                document.getElementById('info').innerHTML = 'Error fetching IP info.';
+                console.error(error);
+            });
+    </script>
+</body>
+</html>
