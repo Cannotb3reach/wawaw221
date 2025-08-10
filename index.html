@@ -1,40 +1,126 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-    <title>Full IP Information</title>
-    <meta charset="UTF-8">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Full IP Info with Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<style>
+:root{--bg:#f6f8fa;--card:#fff;--muted:#6b7280}
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0;
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(180deg,#f8fafc,var(--bg))}
+.card{width:min(900px,95%);padding:28px;border-radius:14px;background:var(--card);
+  box-shadow:0 10px 30px rgba(15,23,42,0.06);text-align:center}
+.title{font-size:1.3rem;margin-bottom:12px}
+.ip{font-size:2rem;font-weight:700;margin:8px 0;letter-spacing:0.6px}
+.note{color:var(--muted);margin-bottom:14px;font-size:0.92rem}
+table{width:100%;border-collapse:collapse;margin-top:10px;text-align:left}
+th,td{padding:6px 8px;border-bottom:1px solid #eee;font-size:0.92rem}
+th{background:#f0f2f5;font-weight:600;width:40%}
+.section-title{background:#e8ebf0;font-weight:bold;text-transform:uppercase;color:#333;font-size:0.85rem}
+.controls{margin-top:16px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+button{padding:8px 14px;border-radius:9px;border:1px solid #e6e9ef;background:#fff;cursor:pointer}
+pre{margin-top:14px;font-family:monospace;font-size:0.9rem;color:#111;word-break:break-all;display:none;text-align:left;max-height:300px;overflow:auto}
+#map{height:300px;margin-top:16px;border-radius:12px}
+</style>
 </head>
 <body>
-    <h1>Your IP and Location Info</h1>
-    <div id="info">Loading...</div>
+<main class="card" role="main" aria-live="polite">
+  <div class="title">🌐 Your Complete Public IP Information</div>
+  <div id="ip" class="ip">loading…</div>
+  <div id="note" class="note">HAHAHAHAHAHAHAHA salamat sa pag click goodboy.</div>
 
-    <script>
-        fetch('https://ipapi.co/json/')
-            .then(response => response.json())
-            .then(data => {
-                let mapLink = `https://www.google.com/maps?q=${data.latitude},${data.longitude}`;
-                document.getElementById('info').innerHTML = `
-                    <p><strong>IP Address:</strong> ${data.ip}</p>
-                    <p><strong>City:</strong> ${data.city}</p>
-                    <p><strong>Region:</strong> ${data.region}</p>
-                    <p><strong>Country:</strong> ${data.country_name} (${data.country_code})</p>
-                    <p><strong>Postal Code:</strong> ${data.postal}</p>
-                    <p><strong>Latitude:</strong> ${data.latitude}</p>
-                    <p><strong>Longitude:</strong> ${data.longitude}</p>
-                    <p><strong>Location Map:</strong> <a href="${mapLink}" target="_blank">View on Google Maps</a></p>
-                    <p><strong>Timezone:</strong> ${data.timezone}</p>
-                    <p><strong>Currency:</strong> ${data.currency}</p>
-                    <p><strong>ISP / Organization:</strong> ${data.org}</p>
-                    <p><strong>ASN:</strong> ${data.asn}</p>
-                    <p><strong>Country Calling Code:</strong> ${data.country_calling_code}</p>
-                    <p><strong>Languages:</strong> ${data.languages}</p>
-                    <p><strong>VPN / Proxy Detected:</strong> ${data.security && data.security.is_proxy ? 'Yes' : 'No'}</p>
-                `;
-            })
-            .catch(error => {
-                document.getElementById('info').innerHTML = 'Error fetching IP info.';
-                console.error(error);
-            });
-    </script>
+  <div id="map"></div>
+
+  <table id="infoTable"></table>
+
+  <div class="controls">
+    <button id="refresh">Refresh</button>
+    <button id="rawToggle">Show JSON</button>
+  </div>
+
+  <pre id="raw"></pre>
+</main>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+const ipEl = document.getElementById('ip');
+const tableEl = document.getElementById('infoTable');
+const rawEl = document.getElementById('raw');
+const rawToggle = document.getElementById('rawToggle');
+let map, marker;
+
+async function fetchIPInfo() {
+  ipEl.textContent = 'loading…';
+  tableEl.innerHTML = '';
+  rawEl.style.display = 'none';
+  rawToggle.textContent = 'Show JSON';
+  try {
+    const res = await fetch('https://ipapi.co/json/');
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+
+    ipEl.textContent = data.ip || 'unknown';
+
+    // Map setup
+    if (data.latitude && data.longitude) {
+      if (!map) {
+        map = L.map('map').setView([data.latitude, data.longitude], 10);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        marker = L.marker([data.latitude, data.longitude]).addTo(map);
+      } else {
+        map.setView([data.latitude, data.longitude], 10);
+        marker.setLatLng([data.latitude, data.longitude]);
+      }
+    } else {
+      document.getElementById('map').innerHTML = '<p>No location data available</p>';
+    }
+
+    // Create table with ALL fields
+    let rows = '';
+    const sections = {
+      "General": ["ip","version","hostname","network","asn","org"],
+      "Location": ["city","region","region_code","country_name","country","country_code","continent_code","in_eu","postal","latitude","longitude","timezone","utc_offset"],
+      "Currency": ["currency","currency_name","currency_symbol"],
+      "Language": ["languages"],
+      "Other": ["country_calling_code","reserved"]
+    };
+
+    for (const [section, keys] of Object.entries(sections)) {
+      rows += `<tr><th class="section-title" colspan="2">${section}</th></tr>`;
+      for (const key of keys) {
+        if (data[key] !== undefined && data[key] !== null && data[key] !== '') {
+          rows += `<tr><th>${key}</th><td>${data[key]}</td></tr>`;
+        }
+      }
+    }
+
+    tableEl.innerHTML = rows;
+
+    rawEl.textContent = JSON.stringify(data, null, 2);
+  } catch (err) {
+    ipEl.textContent = 'error';
+    tableEl.innerHTML = '<tr><td colspan="2">Could not fetch IP info</td></tr>';
+    console.error(err);
+  }
+}
+
+document.getElementById('refresh').addEventListener('click', fetchIPInfo);
+rawToggle.addEventListener('click', () => {
+  if (rawEl.style.display === 'none') {
+    rawEl.style.display = 'block';
+    rawToggle.textContent = 'Hide JSON';
+  } else {
+    rawEl.style.display = 'none';
+    rawToggle.textContent = 'Show JSON';
+  }
+});
+
+fetchIPInfo();
+</script>
 </body>
 </html>
